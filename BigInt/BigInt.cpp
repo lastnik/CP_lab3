@@ -49,6 +49,7 @@ BigInt::BigInt():number(0), bitSize(0)
 
 void BigInt::setByString(std::string const& str)
 {
+    number.clear(); negative = false; bitSize = 0;
     bitSize = (str.size() & 1) ? 4 : 0;
     size_t newSize = (str.size() + 1) >> 1;
     number.resize(newSize, 0);
@@ -61,9 +62,16 @@ void BigInt::setByString(std::string const& str)
         }
         catch(error::Exeption& exp)
         {
-            number.clear();
-            Logger::print<Log::Level::fatal>(exp.what().c_str());
-            throw error::ExeptionBase<error::ErrorList::FatalTrace>("Fail function BigInt::setByString()");
+            if(negative)
+            {
+                number.clear();
+                Logger::print<Log::Level::fatal>(exp.what().c_str());
+                throw error::ExeptionBase<error::ErrorList::FatalTrace>("Fail function BigInt::setByString()");
+            }else
+            {
+                if(i == '-')
+                    negative = true;
+            }
         }
         bitSize += 4;
     }
@@ -73,24 +81,27 @@ void BigInt::setByString(std::string const& str)
 bool operator>(BigInt const& a, BigInt const& b)
 {
     if(a == b) return false;
+    bool res = false;
     if (a.bitSize > b.bitSize)
     {
-        return true;
+        res = true;
     }else if(a.bitSize < b.bitSize)
     {
-        return false;
+        res = false;
     }
-    for(size_t i = a.number.size() - 1; i > 0; i--)
+    for(int i = a.number.size() - 1; i >= 0; i--)
     {
         if(a.number[i] > b.number[i])
         {
-            return true;
+            res = true;
+            break;
         }else if(a.number[i] < b.number[i])
         {
-            return false;
+            res = false;
+            break;
         }
     }
-    return a.number[0] > b.number[0];
+    return a.negative == !res; // same (a.negative) ? !res : res;
 }
 bool operator<(BigInt const& a, BigInt const& b)
 {
@@ -99,7 +110,7 @@ bool operator<(BigInt const& a, BigInt const& b)
 }
 bool operator!=(BigInt const& a, BigInt const& b)
 {
-    if(a.bitSize != b.bitSize) return true;
+    if(a.bitSize != b.bitSize || a.negative != b.negative) return true;
     uint8_t x = 0;
     for(size_t i = 0; i < a.number.size(); i++)
     {
@@ -134,6 +145,7 @@ BigInt operator*(BigInt const& _a, BigInt const& b)
     if(b.bitSize == 1 && b.number[0] == 1) return _a;
 
     BigInt a = _a;
+    a.negative = false;
     for(size_t i = 1; i < b.bitSize; i++)
     {
         a <<= 1;
@@ -143,11 +155,24 @@ BigInt operator*(BigInt const& _a, BigInt const& b)
             a += _a;
         }
     }
+    if(_a.negative ^ b.negative)
+        a.negative = true;
     return a;
 }
 // TODO: refactoring without recursive call operator+()
-BigInt operator+(BigInt const& a, BigInt const& b)
+BigInt operator+(BigInt const& _a, BigInt const& _b)
 {
+    if(_a.negative != _b.negative)
+    {
+        if(_a.negative)
+        {
+            return _b - (-_a);
+        }else
+        {
+            return _a - (-_b);
+        }
+    }
+    auto a = _a; auto b = _b; a.negative = b.negative = false;
     bool p = (a > b);
     BigInt max = p ? a : b;
     BigInt min = p ? b : a;
@@ -181,11 +206,13 @@ BigInt operator-(BigInt const& _a, BigInt const& _b)
 {
     if(_b > _a)
     {
-        Logger::print<Log::Level::fatal>("operator-(a,b) (a = %s) < (b = %s)", _a.toString().c_str(), _b.toString().c_str());
-        throw error::ExeptionBase<error::ErrorList::ArithmeticError>("operator-(a,b): a < b");
+        return -(_b - _a);
     }else if(_a == _b)
     {
         return BigInt();
+    }else if(_b.negative)
+    {
+        return _a + (-_b);
     }
     BigInt b(_b);
     BigInt a(_a);
@@ -207,8 +234,17 @@ BigInt operator-(BigInt const& _a, BigInt const& _b)
 
 BigInt operator/(BigInt const& _a, BigInt const& _b)
 {
-    if(_a < _b)
+    if(_a < _b) {
         return BigInt();
+    }
+    if(_b.negative)
+    {
+        return -(_a / -_b);
+    }
+    if(_a.negative)
+    {
+        return -(((-_a) - "1"_BigInt) / _b + "1"_BigInt);
+    }
     size_t k = _a.bitSize - _b.bitSize;
     BigInt a = _a;
     BigInt b = _b;
@@ -226,7 +262,6 @@ BigInt operator/(BigInt const& _a, BigInt const& _b)
             a = a - (b << k);
             res += "1"_BigInt << k;
             k = a.bitSize - b.bitSize;
-
         }
     }
     if(a == b)
@@ -236,6 +271,10 @@ BigInt operator/(BigInt const& _a, BigInt const& _b)
 
 BigInt operator^(BigInt const& _a, BigInt const& b)
 {
+    if(b.negative)
+    {
+        throw error::ExeptionBase<error::ErrorList::ArithmeticError>("a(" + _a.toString() + ") ^ b(" +  b.toString() + ") can't calculated b < 0");
+    }
     if(b.bitSize == 0)
     {
         return "1"_BigInt;
@@ -243,6 +282,7 @@ BigInt operator^(BigInt const& _a, BigInt const& b)
     if(b.bitSize == 1 && b.number[0] == 1) return _a;
 
     BigInt a = _a;
+    a.negative = false;
     for(size_t i = 1; i < b.bitSize; i++)
     {
         a *= a;
@@ -252,6 +292,8 @@ BigInt operator^(BigInt const& _a, BigInt const& b)
             a *= _a;
         }
     }
+    if(_a.negative && (b.number[0] & 0x1))
+        a.negative = true;
     return a;
 }
 
@@ -275,6 +317,7 @@ BigInt operator<<(BigInt const & a,  uint64_t n)
     }
     if(t != 0) res.number.push_back(t);
     res.calcBitSize();
+    res.negative = a.negative;
     return res;
 }
 
@@ -318,6 +361,7 @@ BigInt operator>>(BigInt const & a, uint64_t n)
     {
         res.number[(res.bitSize - 1) >> 3] = ((local & low) >> left) | ((local & high) << (8 - left));
     }
+    res.negative = a.negative;
     return res;
 }
 
@@ -370,6 +414,8 @@ std::string BigInt::toString() const
         }
         first = false;
     }
+    if(negative)
+        str = "-" + str;
     return str;
 }
 
@@ -432,10 +478,16 @@ BigInt operator--(BigInt &a, int)
     return b;
 }
 
+BigInt operator-(BigInt const & a) {
+    BigInt _a = a;
+    _a.negative = !_a.negative;
+    return _a;
+}
+
 BigInt operator""_BigInt(const char* str, size_t)
 {
-BigInt i; i.setByString(str);
-return i;
+    BigInt i; i.setByString(str);
+    return i;
 }
 
 }

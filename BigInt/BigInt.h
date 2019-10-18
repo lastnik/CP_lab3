@@ -33,6 +33,8 @@ public:
 
     friend BigInt operator^(BigInt const &, BigInt const &);
 
+    friend BigInt operator-(BigInt const &);
+
     BigInt& operator*=(BigInt const &);
 
     BigInt& operator+=(BigInt const &);
@@ -77,6 +79,7 @@ public:
 protected:
     void calcBitSize();
     std::vector<uint8_t> number;
+    bool negative = false;
     size_t bitSize;
 };
 

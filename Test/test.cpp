@@ -1,9 +1,5 @@
 #include <iostream>
 #include <gtest/gtest.h>
-TEST( HELLO, WORLD)
-{
-    EXPECT_EQ(true, true);
-}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
