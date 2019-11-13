@@ -44,6 +44,9 @@ inline char convert(uint8_t const& a)
 
 }
 
+
+
+
 BigInt::BigInt():number(0), bitSize(0)
 {}
 
@@ -89,19 +92,33 @@ bool operator>(BigInt const& a, BigInt const& b)
     {
         res = false;
     }
-    for(int i = a.number.size() - 1; i >= 0; i--)
+    else
     {
-        if(a.number[i] > b.number[i])
-        {
-            res = true;
-            break;
-        }else if(a.number[i] < b.number[i])
-        {
-            res = false;
-            break;
+        for (int i = a.number.size() - 1; i >= 0; i--) {
+            if (a.number[i] > b.number[i]) {
+                res = true;
+                break;
+            } else if (a.number[i] < b.number[i]) {
+                res = false;
+                break;
+            }
         }
     }
-    return a.negative == !res; // same (a.negative) ? !res : res;
+    if(a.negative && b.negative)
+    {
+        res = !res;
+    }else if(!a.negative && !b.negative)
+    {
+        
+    }
+    else if(a.negative)
+    {
+        res = false;
+    }else if(b.negative)
+    {
+        res = true;
+    }
+    return res;
 }
 bool operator<(BigInt const& a, BigInt const& b)
 {
@@ -139,11 +156,15 @@ BigInt BigInt::operator%(BigInt const & p) const
     return *this - p * (*this / p);
 }
 
-BigInt operator*(BigInt const& _a, BigInt const& b)
-{
-    if(b.bitSize == 0) return BigInt();
-    if(b.bitSize == 1 && b.number[0] == 1) return _a;
-
+BigInt operator*(BigInt const& _a, BigInt const& b) {
+    if (b.bitSize == 0) return BigInt();
+    if (b.bitSize == 1 && b.number[0] == 1)
+    {
+        if(!b.negative)
+            return _a;
+        else
+            return -_a;
+    }
     BigInt a = _a;
     a.negative = false;
     for(size_t i = 1; i < b.bitSize; i++)
@@ -488,6 +509,24 @@ BigInt operator""_BigInt(const char* str, size_t)
 {
     BigInt i; i.setByString(str);
     return i;
+}
+
+std::tuple<BigInt, BigInt, BigInt> gcb(BigInt const& a, BigInt const& b)
+{
+    if(a > b)
+        return gcb(b, a);
+    BigInt x, y;
+    if(a == "0"_BigInt)
+    {
+        x = "0"_BigInt;
+        y = "1"_BigInt;
+        return {b, x, y};
+    }
+    auto [d1, x1, y1] = gcb(b % a, a);
+    auto o = (b / a) * x1;
+    x = y1 - o;
+    y = x1;
+    return {d1, x, y};
 }
 
 }

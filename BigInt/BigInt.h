@@ -2,11 +2,9 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <tuple>
 namespace  BigInteger
 {
-
-
-
 class BigInt
 {
 
@@ -76,12 +74,15 @@ public:
     friend bool operator<=(BigInt const &, BigInt const &);
 
     size_t getBitSize() const { return bitSize;}
+    std::vector<uint8_t> getVector() const { return number;}
 protected:
     void calcBitSize();
     std::vector<uint8_t> number;
     bool negative = false;
     size_t bitSize;
 };
+          // d       x       y
+std::tuple<BigInt, BigInt, BigInt> gcb(BigInt const &, BigInt const &);
 
 BigInt operator""_BigInt(const char* str, size_t);
 
